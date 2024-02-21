@@ -1,0 +1,70 @@
+
+#define ECG_Pin 0    //Amplified ECG input (analog input)
+#define QRS_Pin 3    //Comparator input (digital input)
+#define STIM_Pin 13  //PM Stim indicator (digital output)
+
+// Global variables
+volatile int    ECG = 0;                //ECG input
+unsigned long    t_prev = 0;             //Previous beat (ms)
+unsigned long    t_beat = 0;             //PRevious beat (ms)
+volatile int    LRI = 1000;             //Lower rate interval (ms);
+volatile int    beat = 1;               //# of beats that have occurred
+volatile int    RR;                     //RR interval (ms)
+unsigned long timer = 0;                //Sampling timer (ms)
+int sampPeriod = 10;                    //Sampling period (ms)
+
+void ISR_VVI() {
+  
+  t_beat = millis();    //Detects current beat time
+  
+  if (beat > 1) {
+    
+    t_prev = t_beat;    //Makes the current beat time the previous beat time
+    beat = beat + 1;
+    Serial.print(t_prev);
+    Serial.print("     ");
+    Serial.print("Natural Beat");
+    Serial.print("     ");
+    Serial.println(beat);
+  
+  }
+}
+
+void setup ()
+{
+  Serial.begin(9600);
+  attachInterrupt(QRS_Pin,ISR_VVI,RISING);
+  pinMode(QRS_Pin,INPUT);
+  pinMode(STIM_Pin,OUTPUT);
+  digitalWrite(STIM_Pin,LOW);
+  //digitalWrite(QRS_Pin,LOW);
+ 
+}
+
+void loop (){
+  if (millis() - timer > sampPeriod) {
+    ECG = analogRead(ECG_Pin);
+    //Serial.println(ECG);
+  
+    RR = millis() - t_prev;  //Examining the current time with respect to the previous beat
+  
+      if (RR > LRI){
+        t_prev = millis();                 //Marks the stimulus as the current beat time
+        digitalWrite(STIM_Pin,HIGH);       //Fire the stimulus
+        delay(100);                        //Stimulus duration
+        digitalWrite(STIM_Pin,LOW);
+        beat = beat + 1;
+        // Serial.print(t_prev);
+        // Serial.print("     ");
+        // Serial.print("Stim Beat");
+        // Serial.print("     ");
+        // Serial.println(beat);
+  }  
+  
+    timer = millis();    
+
+  }
+}
+  
+  
+ 
