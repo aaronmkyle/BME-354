@@ -4,61 +4,72 @@
 #define STIM_Pin 13  //PM Stim indicator (digital output)
 
 // Global variables
-volatile int    ECG = 0;                //ECG input
+volatile int    LRI = 2450;             //Lower rate interval (ms);
+volatile int    beat = 1;               //# of beats that have occurred
+volatile int    sampPeriod = 10;                    //Sampling period (ms)
+
+int     ECG = 0;                //ECG input
+int     Comp = 0;               //Contemperaneous Comparator value
+int     CompPrev = 0;           //Previous comparator value
+int     CompThresh = 400;         //Comparator threshold (~4V)
+
+float HR = 0.0;                   //HR in bpm
+
 unsigned long    t_prev = 0;             //Previous beat (ms)
 unsigned long    t_beat = 0;             //PRevious beat (ms)
-volatile int    LRI = 1000;             //Lower rate interval (ms);
-volatile int    beat = 1;               //# of beats that have occurred
-volatile int    RR;                     //RR interval (ms)
-unsigned long timer = 0;                //Sampling timer (ms)
-int sampPeriod = 10;                    //Sampling period (ms)
-
-void ISR_VVI() {
-  
-  t_beat = millis();    //Detects current beat time
-  
-  if (beat > 1) {
-    
-    t_prev = t_beat;    //Makes the current beat time the previous beat time
-    beat = beat + 1;
-    Serial.print(t_prev);
-    Serial.print("     ");
-    Serial.print("Natural Beat");
-    Serial.print("     ");
-    Serial.println(beat);
-  
-  }
-}
+unsigned long    timer = 0;                //Sampling timer (ms)
+unsigned long    RR = 0; 
 
 void setup ()
 {
   Serial.begin(9600);
-  attachInterrupt(QRS_Pin,ISR_VVI,RISING);
-  pinMode(QRS_Pin,INPUT);
   pinMode(STIM_Pin,OUTPUT);
   digitalWrite(STIM_Pin,LOW);
-  //digitalWrite(QRS_Pin,LOW);
- 
 }
 
 void loop (){
-  if (millis() - timer > sampPeriod) {
+ if (millis() - timer > sampPeriod) {
     ECG = analogRead(ECG_Pin);
-    //Serial.println(ECG);
+    CompPrev = Comp;
+    Comp = analogRead(A5);      //Read the comparator input from analog pin 5
+    //Serial.println(Comp);
+
+    if (Comp > CompThresh && CompPrev < CompThresh) {
+      t_prev = t_beat;        //Shift current beat time to past
+      t_beat = millis();      //Detects current beat time
+
+      HR = 60000/(t_beat-t_prev);   // HR in bpm
+      
   
-    RR = millis() - t_prev;  //Examining the current time with respect to the previous beat
+        //if (beat > 1) {
+          
+          //t_prev = t_beat;    //Makes the current beat time the previous beat time
+          beat = ++beat;
+           Serial.print(t_beat - t_prev);
+           Serial.print("     ");
+           Serial.print("Natural Beat");
+           Serial.print("     ");
+           Serial.println(beat);
+          
+        //}
+    }
+  
+    RR = millis() - t_beat;         //Examining the current time with respect to the previous beat
+
+    //Serial.println(RR);
   
       if (RR > LRI){
-        t_prev = millis();                 //Marks the stimulus as the current beat time
+        t_beat = millis();                 //Marks the stimulus as the current beat time
         digitalWrite(STIM_Pin,HIGH);       //Fire the stimulus
-        delay(100);                        //Stimulus duration
+        delay(100);                        //Stimulus duration (adjust this value based on S-D curve)
         digitalWrite(STIM_Pin,LOW);
-        beat = beat + 1;
-        // Serial.print(t_prev);
-        // Serial.print("     ");
-        // Serial.print("Stim Beat");
-        // Serial.print("     ");
-        // Serial.println(beat);
+        
+        beat = ++beat;
+        Serial.print(t_prev);
+        Serial.print("     ");
+        Serial.print("Stim Beat");
+        Serial.print("     ");
+        Serial.println(beat);
   }  
   
     timer = millis();    
